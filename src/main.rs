@@ -6,12 +6,12 @@ struct FloatingText {
     text: String,
     x: u16,
     y: u16,
-    speed: u64,
+    speed: u16,
     last_update: time::Instant,
 }
 
 impl FloatingText {
-    fn new(text: &str, x: u16, y: u16, speed: u64) -> Self {
+    fn new(text: &str, x: u16, y: u16, speed: u16) -> Self {
         Self {
             text: text.to_string(),
             x,
@@ -56,15 +56,19 @@ fn print_ascii(ascii: &str, x: u16, y: u16) {
 
 fn send_texts(texts: &mut Vec<Arc<Mutex<FloatingText>>>, messages: &Vec<&str>, size: (u16, u16)) {
     for _ in 0..15 {
-        let text = messages[rand::thread_rng().gen_range(0..messages.len())];
-        let mut generate_y = rand::thread_rng().gen_range(0..size.1);
+        let text = messages[generate_random_range(0, messages.len() as u16) as usize];
+        let mut generate_y = generate_random_range(0, size.1);
 
         while texts.iter().any(|text: &Arc<Mutex<FloatingText>>| text.lock().unwrap().y == generate_y) {
-            generate_y = rand::thread_rng().gen_range(0..size.1);
+            generate_y = generate_random_range(0, size.1);
         }
 
-        texts.push(Arc::new(Mutex::new(FloatingText::new(text, size.0, rand::thread_rng().gen_range(0..size.1), rand::thread_rng().gen_range(20..70)))));
+        texts.push(Arc::new(Mutex::new(FloatingText::new(text, size.0, generate_random_range(0, size.1), generate_random_range(20, 70)))));
     }
+}
+
+fn generate_random_range(min: u16, max: u16) -> u16 {
+    rand::thread_rng().gen_range(min..max)
 }
 
 fn main() {
@@ -105,10 +109,11 @@ fn main() {
         "I love the detective from Episode 5!",
         "<Very good> I like Furudo Erika!",
         "I want to be with Furudo Erika!",
-        "She is my favorite character!",
+        "Furudo Erika is my favorite!",
         "Furudo Erika is gorgeous!",
         "Furudo Erika is an amazing detective!",
         "I like Furudo Erika so much!",
+        "Furudo Erika best girl!",
         "<Oh yeaaaaaaaaaaaah! Veeeeeerrryyyyy goooooodd!!!>",
         "<Good>",
     ];
@@ -128,7 +133,7 @@ fn main() {
             for text in &texts {
                 let mut text = text.lock().unwrap();
                 if text.update() {
-                    println!(
+                    print!(
                         "\x1B[{};{}H{}\x1B[K",
                         text.y, text.x, text.text
                     );
@@ -138,12 +143,12 @@ fn main() {
                     if text.x == 0 {
                         text.clear();
                         text.x = size.0;
-                        text.y = rand::thread_rng().gen_range(0..size.1);
-                        text.speed = rand::thread_rng().gen_range(20..70);
+                        text.y = generate_random_range(0, size.1);
+                        text.speed = generate_random_range(20, 70);
                     }
                 }
             }
-            thread::sleep(time::Duration::from_millis(20));
+            thread::sleep(time::Duration::from_millis(10));
         }
     });
 
