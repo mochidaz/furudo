@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 use rand::Rng;
+use crossterm::terminal::{Clear, ClearType::All};
 
 struct FloatingText {
     text: String,
@@ -43,7 +44,7 @@ impl FloatingText {
 }
 
 fn clear_screen() {
-    println!("{}", termion::clear::All);
+    print!("{}", Clear(All));
 }
 
 fn print_ascii(ascii: &str, x: u16, y: u16) {
@@ -120,7 +121,7 @@ fn main() {
 
     let mut texts = Vec::new();
 
-    let size = termion::terminal_size().unwrap();
+    let size = crossterm::terminal::size().unwrap();
 
     send_texts(&mut texts, &messages, size);
 
