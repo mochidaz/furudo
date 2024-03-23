@@ -1,95 +1,21 @@
-use std::sync::{Arc, mpsc, Mutex, RwLock};
-use std::{thread, time};
+mod text;
+mod utils;
+
+use std::sync::{Arc, Mutex, RwLock};
+use std::{thread};
 use std::time::Duration;
+
 use crossterm::event;
-use crossterm::event::{Event, KeyCode, KeyEvent};
+use crossterm::event::{Event, KeyCode};
 
 use rand::Rng;
-use crossterm::terminal::{Clear, ClearType::All};
+
+use crate::utils::{clear_screen, print_ascii, send_texts};
 
 #[derive(PartialEq)]
 enum Status {
     Running,
     Stopped,
-}
-
-struct FloatingText {
-    text: String,
-    x: u16,
-    y: u16,
-    speed: u16,
-    last_update: time::Instant,
-}
-
-impl FloatingText {
-    fn new(text: &str, x: u16, y: u16, speed: u16) -> Self {
-        Self {
-            text: text.to_string(),
-            x,
-            y,
-            speed,
-            last_update: time::Instant::now(),
-        }
-    }
-
-    fn move_left(&mut self) {
-        if self.x > 0 {
-            self.x -= 1;
-        }
-    }
-
-    fn update(&mut self) -> bool {
-        let elapsed = self.last_update.elapsed();
-        if elapsed.as_millis() >= self.speed as u128 {
-            self.last_update = time::Instant::now();
-            true
-        } else {
-            false
-        }
-    }
-
-    fn clear(&self) {
-        print!("\x1B[{};{}H\x1B[K", self.y, self.x);
-    }
-}
-
-fn clear_screen() {
-    println!("{}", Clear(All));
-}
-
-fn print_ascii(ascii: &str, x: u16, y: u16) {
-    let mut y = y;
-    for line in ascii.lines() {
-        print!("\x1B[{};{}H{}", y, x, line);
-        y += 1;
-    }
-}
-
-fn send_texts(texts: &Arc<Mutex<Vec<Arc<Mutex<FloatingText>>>>>, messages: &[&str], size: (u16, u16), amount: u16) {
-    let mut texts = texts.lock().unwrap();
-    for _ in 0..amount {
-        let text = messages[generate_random_range(0, messages.len() as u16) as usize];
-        let mut generate_y = generate_random_range(0, size.1);
-
-        while texts.iter().any(|text| text.lock().unwrap().y == generate_y) {
-            generate_y = generate_random_range(0, size.1);
-        }
-
-        texts.push(Arc::new(
-            Mutex::new(
-                FloatingText::new(
-                    text,
-                    size.0,
-                    generate_y,
-                    generate_random_range(20, 70
-                )
-            )
-        )));
-    }
-}
-
-fn generate_random_range(min: u16, max: u16) -> u16 {
-    rand::thread_rng().gen_range(min..max)
 }
 
 fn main() {
@@ -190,20 +116,17 @@ fn main() {
         for text in vec.iter_mut() {
             let mut text = text.lock().unwrap();
             if text.update() {
-                print!(
-                    "\x1B[{};{}H{}\x1B[K",
-                    text.y, text.x, text.text
-                );
+                text.print();
 
                 text.move_left();
 
-                if text.x == 0 {
+                if text.has_ended() {
                     text.clear();
                 }
             }
         }
 
-        vec.retain(|text| text.lock().unwrap().x > 0);
+        vec.retain(|text| text.lock().unwrap().width() > 0);
 
         if *status.read().unwrap() == Status::Stopped {
             break;
