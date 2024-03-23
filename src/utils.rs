@@ -19,26 +19,25 @@ pub fn print_ascii(ascii: &str, x: u16, y: u16) {
     }
 }
 
-pub fn send_texts(texts: &Arc<Mutex<Vec<Arc<Mutex<FloatingText>>>>>, messages: &[&str], size: (u16, u16), amount: u16) {
+pub fn send_texts(texts: &Arc<Mutex<Vec<FloatingText>>>, messages: &[&str], size: (u16, u16), amount: u16) {
     let mut texts = texts.lock().unwrap();
     for _ in 0..amount {
         let text = messages[generate_random_range(0, messages.len() as u16) as usize];
         let mut generate_y = generate_random_range(0, size.1);
 
-        while texts.iter().any(|text| text.lock().unwrap().height() == generate_y) {
+        while texts.iter().any(|text| text.height() == generate_y) {
             generate_y = generate_random_range(0, size.1);
         }
 
-        texts.push(Arc::new(
-            Mutex::new(
-                FloatingText::new(
-                    text,
-                    size.0,
-                    generate_y,
-                    generate_random_range(20, 70
-                    )
+        texts.push(
+            FloatingText::new(
+                text,
+                size.0,
+                generate_y,
+                generate_random_range(20, 70
                 )
-            )));
+            )
+        );
     }
 }
 

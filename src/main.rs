@@ -113,8 +113,7 @@ fn main() {
 
         let mut vec = receiver_vector.lock().unwrap();
 
-        for text in vec.iter_mut() {
-            let mut text = text.lock().unwrap();
+        for mut text in vec.iter_mut() {
             if text.update() {
                 text.print();
 
@@ -126,7 +125,7 @@ fn main() {
             }
         }
 
-        vec.retain(|text| text.lock().unwrap().width() > 0);
+        vec.retain(|text| text.width() > 0);
 
         if *status.read().unwrap() == Status::Stopped {
             break;
