@@ -1,8 +1,17 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, mpsc, Mutex, RwLock};
 use std::{thread, time};
+use std::time::Duration;
+use crossterm::event;
+use crossterm::event::{Event, KeyCode, KeyEvent};
 
 use rand::Rng;
 use crossterm::terminal::{Clear, ClearType::All};
+
+#[derive(PartialEq)]
+enum Status {
+    Running,
+    Stopped,
+}
 
 struct FloatingText {
     text: String,
@@ -45,7 +54,7 @@ impl FloatingText {
 }
 
 fn clear_screen() {
-    print!("{}", Clear(All));
+    println!("{}", Clear(All));
 }
 
 fn print_ascii(ascii: &str, x: u16, y: u16) {
@@ -72,7 +81,7 @@ fn send_texts(texts: &Arc<Mutex<Vec<Arc<Mutex<FloatingText>>>>>, messages: &[&st
                     text,
                     size.0,
                     generate_y,
-                    generate_random_range(50, 200
+                    generate_random_range(20, 70
                 )
             )
         )));
@@ -136,41 +145,72 @@ fn main() {
 
     let sender_queue = Arc::clone(&texts);
 
+    let mut status = Arc::new(RwLock::new(Status::Running));
+
+    let sender_status = Arc::clone(&status);
+
     let sender = thread::spawn(move || {
+        let status = Arc::clone(&sender_status);
+
         loop {
             send_texts(&sender_queue, &messages, size, 1);
-            thread::sleep(time::Duration::from_secs(1));
+            thread::sleep(Duration::from_secs(1));
+
+            if *status.read().unwrap() == Status::Stopped {
+                break;
+            }
         }
     });
 
-    let receiver_queue = Arc::clone(&texts);
+    let receiver_vector = Arc::clone(&texts);
 
-    let receiver = thread::spawn(move || {
+    let receiver_status = Arc::clone(&status);
+
+    let event_handler = thread::spawn(move || {
         loop {
-            print_ascii(erika, size.0 / 4, size.1 / 9);
-
-            let mut queue = receiver_queue.lock().unwrap();
-
-            for text in queue.iter_mut() {
-                let mut text = text.lock().unwrap();
-                if text.update() {
-                    print!(
-                        "\x1B[{};{}H{}\x1B[K",
-                        text.y, text.x, text.text
-                    );
-
-                    text.move_left();
-
-                    if text.x == 0 {
-                        text.clear();
+            if let Event::Key(event) = event::read().unwrap() {
+                match event.code {
+                    KeyCode::Enter => {
+                        *status.write().unwrap() = Status::Stopped;
+                        break;
                     }
+                    _ => {}
                 }
             }
-
-            queue.retain(|text| text.lock().unwrap().x > 0);
         }
     });
 
-    sender.join().unwrap();
-    receiver.join().unwrap();
+    loop {
+        let status = Arc::clone(&receiver_status);
+
+        print_ascii(erika, size.0 / 4, size.1 / 9);
+
+        let mut vec = receiver_vector.lock().unwrap();
+
+        for text in vec.iter_mut() {
+            let mut text = text.lock().unwrap();
+            if text.update() {
+                print!(
+                    "\x1B[{};{}H{}\x1B[K",
+                    text.y, text.x, text.text
+                );
+
+                text.move_left();
+
+                if text.x == 0 {
+                    text.clear();
+                }
+            }
+        }
+
+        vec.retain(|text| text.lock().unwrap().x > 0);
+
+        if *status.read().unwrap() == Status::Stopped {
+            break;
+        }
+    }
+
+    if sender.join().is_ok() && event_handler.join().is_ok() {
+        clear_screen();
+    }
 }
