@@ -8,8 +8,6 @@ use std::time::Duration;
 use crossterm::event;
 use crossterm::event::{Event, KeyCode};
 
-use rand::Rng;
-
 use crate::utils::{clear_screen, print_ascii, send_texts};
 
 #[derive(PartialEq)]
@@ -69,20 +67,18 @@ fn main() {
 
     let texts = Arc::new(Mutex::new(Vec::new()));
 
-    let sender_queue = Arc::clone(&texts);
+    let sender_vector = Arc::clone(&texts);
 
-    let mut status = Arc::new(RwLock::new(Status::Running));
+    let status = Arc::new(RwLock::new(Status::Running));
 
     let sender_status = Arc::clone(&status);
 
     let sender = thread::spawn(move || {
-        let status = Arc::clone(&sender_status);
-
         loop {
-            send_texts(&sender_queue, &messages, size, 1);
+            send_texts(&sender_vector, &messages, size, 1);
             thread::sleep(Duration::from_secs(1));
 
-            if *status.read().unwrap() == Status::Stopped {
+            if *sender_status.read().unwrap() == Status::Stopped {
                 break;
             }
         }
@@ -107,13 +103,11 @@ fn main() {
     });
 
     loop {
-        let status = Arc::clone(&receiver_status);
-
         print_ascii(erika, size.0 / 4, size.1 / 9);
 
         let mut vec = receiver_vector.lock().unwrap();
 
-        for mut text in vec.iter_mut() {
+        for text in vec.iter_mut() {
             if text.update() {
                 text.print();
 
@@ -127,7 +121,7 @@ fn main() {
 
         vec.retain(|text| text.width() > 0);
 
-        if *status.read().unwrap() == Status::Stopped {
+        if *receiver_status.read().unwrap() == Status::Stopped {
             break;
         }
     }
