@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
+
 use rand::Rng;
 use crossterm::terminal::{Clear, ClearType::All};
 
@@ -55,16 +56,26 @@ fn print_ascii(ascii: &str, x: u16, y: u16) {
     }
 }
 
-fn send_texts(texts: &mut Vec<Arc<Mutex<FloatingText>>>, messages: &Vec<&str>, size: (u16, u16)) {
-    for _ in 0..15 {
+fn send_texts(texts: &Arc<Mutex<Vec<Arc<Mutex<FloatingText>>>>>, messages: &[&str], size: (u16, u16), amount: u16) {
+    let mut texts = texts.lock().unwrap();
+    for _ in 0..amount {
         let text = messages[generate_random_range(0, messages.len() as u16) as usize];
         let mut generate_y = generate_random_range(0, size.1);
 
-        while texts.iter().any(|text: &Arc<Mutex<FloatingText>>| text.lock().unwrap().y == generate_y) {
+        while texts.iter().any(|text| text.lock().unwrap().y == generate_y) {
             generate_y = generate_random_range(0, size.1);
         }
 
-        texts.push(Arc::new(Mutex::new(FloatingText::new(text, size.0, generate_random_range(0, size.1), generate_random_range(20, 70)))));
+        texts.push(Arc::new(
+            Mutex::new(
+                FloatingText::new(
+                    text,
+                    size.0,
+                    generate_y,
+                    generate_random_range(50, 200
+                )
+            )
+        )));
     }
 }
 
@@ -76,7 +87,7 @@ fn main() {
     clear_screen();
 
     let erika = "
-    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣾⣿⣷⣶⡀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣾⣿⣷⣶⡀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠀⢠⣿⣿⣿⣿⣿⣿⣷
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣴⣾⣥⡙⠛⢿⣿⠿⢿⣿⣿⠀⢶⣿⣶⣄
 ⠀⠀⠀⠀⠀⠀⠀⢠⣾⣿⣿⣿⣿⣿⣿⣿⣿⣶⣼⡀⠀⡀⠉⠀⠀⡈⣿⣿⣿⡆
@@ -119,19 +130,28 @@ fn main() {
         "<Good>",
     ];
 
-    let mut texts = Vec::new();
-
     let size = crossterm::terminal::size().unwrap();
 
-    send_texts(&mut texts, &messages, size);
+    let texts = Arc::new(Mutex::new(Vec::new()));
 
-    let mut handles = vec![];
+    let sender_queue = Arc::clone(&texts);
 
-    let handle = thread::spawn(move || {
+    let sender = thread::spawn(move || {
+        loop {
+            send_texts(&sender_queue, &messages, size, 1);
+            thread::sleep(time::Duration::from_secs(1));
+        }
+    });
+
+    let receiver_queue = Arc::clone(&texts);
+
+    let receiver = thread::spawn(move || {
         loop {
             print_ascii(erika, size.0 / 4, size.1 / 9);
 
-            for text in &texts {
+            let mut queue = receiver_queue.lock().unwrap();
+
+            for text in queue.iter_mut() {
                 let mut text = text.lock().unwrap();
                 if text.update() {
                     print!(
@@ -143,19 +163,14 @@ fn main() {
 
                     if text.x == 0 {
                         text.clear();
-                        text.x = size.0;
-                        text.y = generate_random_range(0, size.1);
-                        text.speed = generate_random_range(20, 70);
                     }
                 }
             }
-            thread::sleep(time::Duration::from_millis(10));
+
+            queue.retain(|text| text.lock().unwrap().x > 0);
         }
     });
 
-    handles.push(handle);
-
-    for handle in handles {
-        handle.join().unwrap();
-    }
+    sender.join().unwrap();
+    receiver.join().unwrap();
 }
