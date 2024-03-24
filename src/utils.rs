@@ -14,9 +14,13 @@ pub fn clear_screen() {
 pub fn print_ascii(ascii: &str, x: u16, y: u16) {
     let mut y = y;
     for line in ascii.lines() {
-        print!("\x1B[{};{}H{}", y, x, line);
+        print_exact(x, y, line);
         y += 1;
     }
+}
+
+pub fn print_exact(x: u16, y: u16, text: &str) {
+    print!("\x1B[{};{}H{}", y, x, text);
 }
 
 pub fn send_texts(texts: &Arc<Mutex<Vec<FloatingText>>>, messages: &[&str], size: (u16, u16), amount: u16) {
