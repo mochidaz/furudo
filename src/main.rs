@@ -131,7 +131,7 @@ fn main() {
     });
 
     loop {
-        print_ascii(erika, size.0 / 4, size.1 / 9);
+        print_ascii(erika, size.0 / 4, 0);
 
         let mut vec = receiver_vector.lock().unwrap();
 

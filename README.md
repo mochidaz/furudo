@@ -2,4 +2,4 @@
 
 I like Erika.
 
-![img](assets/screenshot.png)
+![img](assets/erika.gif)
